@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 앱 파일을 캐시합니다 (네트워크 우선, 실패 시 캐시)
-const CACHE = 'pporong-v6';
+const CACHE = 'pporong-v7';
 const FILES = ['./', './index.html', './style.css', './theme-y2k.css', './config.js', './store.js', './app.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

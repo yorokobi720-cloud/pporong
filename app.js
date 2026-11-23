@@ -454,7 +454,23 @@ window.addEventListener('hashchange', () => {
   render();
 });
 let current = { name: '' };
+// 상단바에 '처음으로' 버튼을 붙일 화면들
+const EXIT_SCREENS = ['home', 'msgs', 'play', 'my', 'me', 'inbox', 'fans', 'settings', 'artist'];
 function render() {
+  renderRoute();
+  const tb = $('#app .topbar');
+  if (tb && EXIT_SCREENS.includes(current.name) && !$('.exit-btn', tb)) {
+    tb.insertAdjacentHTML('beforeend', '<button class="exit-btn" data-exit title="처음 화면으로">⏏ 처음으로</button>');
+  }
+}
+function goLanding() {
+  stopAudio();
+  session = null; LS.set('session', null);
+  navStack.length = 0;
+  if (location.hash === '#/' || location.hash === '') render(); else location.replace('#/');
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-exit]')) goLanding(); });
+function renderRoute() {
   stopAudio();
   chatCtx = null;
   const [r, p, q] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -518,6 +534,7 @@ Store.on(() => { clearTimeout(refreshT); refreshT = setTimeout(() => { checkNoti
    ========================================================= */
 function renderLanding() {
   const lastFan = F(LS.get('lastFan', ''));
+  const lastArt = A(LS.get('lastArtist', ''));
   const demo = !Store.online && artists().some(a => a.demo);
   app().innerHTML = `<div class="screen landing">
     <div class="scroll" style="padding:calc(48px + var(--safe-top)) 24px 30px">
@@ -525,6 +542,7 @@ function renderLanding() {
       <h1>아티스트와 팬이<br>만나는 곳 💗</h1>
       <p class="lead">좋아하는 아티스트의 멤버십에 가입하고<br>나만을 위한 메시지를 받아보세요</p>
       ${lastFan ? `<button class="enter-card" id="cont">${avatarHTML(lastFan, 44)}<div><b>${esc(lastFan.nickname)}</b>(으)로 계속하기<small>팬으로 입장</small></div><span class="arr">›</span></button>` : ''}
+      ${lastArt ? `<button class="enter-card" id="contArt">${avatarHTML(lastArt, 44)}<div><b>${esc(lastArt.name)}</b>(으)로 계속하기<small>아티스트로 입장 · 비밀번호 필요</small></div><span class="arr">›</span></button>` : ''}
       <div class="enter-card fan-join"><span class="ei">💗</span><div><b>팬으로 입장</b><small>닉네임만 정하면 바로 시작! (2~10자)</small>
         <form class="nick-row" id="nickForm" autocomplete="off"><input class="inp left" id="nickIn" type="text" maxlength="10" placeholder="닉네임 입력" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn pri" type="submit">입장</button></form></div></div>
       <button class="enter-card" id="asArt"><span class="ei">🎤</span><div><b>아티스트로 입장</b><small>아티스트 비밀번호가 필요해요</small></div><span class="arr">›</span></button>
@@ -533,13 +551,14 @@ function renderLanding() {
     </div>
   </div>`;
   if (lastFan) $('#cont').onclick = () => login('fan', lastFan.id);
+  if (lastArt) $('#contArt').onclick = () => artistLogin(lastArt.id);
   $('#nickForm').onsubmit = e => { e.preventDefault(); $('#nickIn').blur(); fanJoin($('#nickIn').value); };
   $('#asArt').onclick = artistLogin;
   $('#reg').onclick = artistRegister;
 }
 function login(role, id) {
   session = { role, id }; LS.set('session', session);
-  if (role === 'fan') LS.set('lastFan', id);
+  if (role === 'fan') LS.set('lastFan', id); else LS.set('lastArtist', id);
   navStack.length = 0;
   const target = role === 'fan' ? '#/home' : '#/me';
   if (location.hash === target) render(); else location.replace(target);
@@ -562,10 +581,10 @@ async function fanJoin(nick) {
   login('fan', f.id);
   toast(`${josa(n)} 환영해! 💗`);
 }
-async function artistLogin() {
+async function artistLogin(preset) {
   const list = artists();
   if (!list.length) return toast('아직 등록된 아티스트가 없어요');
-  const aid = await modal(`<h2>어떤 아티스트인가요?</h2><div class="pick-list">${list.map(a => `<button data-a="${a.id}">${avatarHTML(a, 40)}<b>${esc(a.name)}</b></button>`).join('')}</div><div class="row"><button class="btn" data-x>취소</button></div>`,
+  const aid = typeof preset === 'string' ? preset : await modal(`<h2>어떤 아티스트인가요?</h2><div class="pick-list">${list.map(a => `<button data-a="${a.id}">${avatarHTML(a, 40)}<b>${esc(a.name)}</b></button>`).join('')}</div><div class="row"><button class="btn" data-x>취소</button></div>`,
     (m, done) => { $$('[data-a]', m).forEach(b => (b.onclick = () => done(b.dataset.a))); m.querySelector('[data-x]').onclick = () => done(null); });
   if (!aid) return;
   const a = A(aid);
