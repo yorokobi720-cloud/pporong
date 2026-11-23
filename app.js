@@ -1130,14 +1130,6 @@ function pickReply(replies, text) {
   if (hit) return hit.reply;
   return generic.length ? pick(generic) : null;
 }
-function autoReply(a, f, text, pool) {
-  if (!a.auto_reply) return;
-  const now = Date.now();
-  if (Store.all('message', m => m.artist_id === a.id && m.fan_id === f.id && m.auto && m.at > now).length) return;
-  const reply = pool ? pick(pool) : pickReply(a.replies, text);
-  if (!reply) return;
-  Store.insert('message', { artist_id: a.id, fan_id: f.id, from: 'artist', type: 'text', text: reply, at: now + 2500 + Math.random() * 4000, auto: true });
-}
 function renderChat(aid) {
   const a = A(aid), f = meFan();
   if (!a) return back();
@@ -1147,7 +1139,6 @@ function renderChat(aid) {
   bindChatCommon((type, text) => {
     const m = Store.insert('message', { artist_id: aid, fan_id: f.id, from: 'fan', type, text, at: Date.now() });
     freshIds.add(m.id);
-    autoReply(a, f, type === 'sticker' ? '' : text);
     msgPoint();
     renderChatBody(true);
   }, true);
@@ -1261,7 +1252,6 @@ function renderWrite(toId) {
     if (!(await confirmBox(`${a.name}에게 편지를 보낼까요?`, '', '보내기'))) return;
     const f = meFan();
     Store.insert('letter', { artist_id: a.id, fan_id: f.id, dir: 'to', title: draft.title.trim(), body: draft.body, color: draft.color, ink: draft.ink, stickers: draft.stickers, at: Date.now(), read: false });
-    autoReply(a, f, '', LETTER_THANKS);
     draft = null; msgTab = 'letter'; letterTab = 'to';
     toast('편지를 보냈어요 💌'); addPoints(5, '편지');
     back();
@@ -1303,12 +1293,8 @@ function doStamp() {
   const tk = todayKey(), st = f.stamps || { last: '', count: 0 };
   if (st.last === tk) return null;
   const count = st.count + 1, bonus = count % 10 === 0;
-  Store.update(f.id, { stamps: { last: tk, count }, points: (f.points || 0) + 3 });
-  if (bonus) {
-    const subs = mySubs(); const a = subs.length ? pick(subs) : null;
-    if (a) Store.insert('message', { artist_id: a.id, fan_id: f.id, from: 'artist', type: 'card', emoji: '🏆', title: '출석 도장 10개 달성!', text: '{이름아} 도장 10개를 다 모았구나! 정말 대단해 👏 칭찬 하트 20개 선물이야 💗', points: 20, at: Date.now() + 2500, auto: true });
-    else Store.update(f.id, { points: (f.points || 0) + 23 });
-  }
+  // 아티스트 이름으로 자동 메시지를 보내지 않고, 하트만 바로 지급
+  Store.update(f.id, { stamps: { last: tk, count }, points: (f.points || 0) + 3 + (bonus ? 20 : 0) });
   return { bonus };
 }
 function stampFeedback(r) { if (!r) return; floatPoint(3, '출석'); if (r.bonus) { setTimeout(() => floatPoint(20, '도장 10개!'), 700); confetti(); } }
@@ -1337,7 +1323,7 @@ function renderPlay() {
       <div class="stamp-board">${slots}</div>
       <div style="padding:0 16px">
         <button class="btn full ${done ? '' : 'pri'}" id="stampBtn" ${done ? 'disabled' : ''} style="margin-top:12px">${done ? '오늘 도장 완료! 내일 또 만나 👋' : '도장 쾅! 찍기'}</button>
-        <div class="hint" style="text-align:center">하루에 한 번! 10개를 모으면 아티스트가 칭찬해 줘요 🏆</div>
+        <div class="hint" style="text-align:center">하루에 한 번! 10개를 모으면 보너스 하트 20개 🏆</div>
       </div>
       <div class="section-title" style="margin-top:10px">아티스트 앨범</div>
       ${rows || '<div class="hint" style="padding:0 20px">멤버십에 가입하면 앨범이 생겨요</div>'}
@@ -1685,12 +1671,6 @@ function renderSettings() {
         <button class="btn full dark" id="sSave2">저장</button>
       </section>
       <section class="p-sec">
-        <h3>자동 답장 <button class="toggle ${a.auto_reply ? 'on' : ''}" id="sAR"></button></h3>
-        <div class="hint" style="margin-top:-4px">팬이 메시지를 보내면 몇 초 뒤 아래 문장 중 하나로 대신 답장해요. (아티스트가 바쁠 때 좋아요)<br>· 한 줄에 하나씩<br>· <b>키워드 =&gt; 답장</b> : 키워드가 들어간 메시지엔 그 답장<br>· <b>{이름}</b>, <b>{이름아}</b> 는 팬 닉네임으로 바뀌어요</div>
-        <textarea class="inp" id="sRep" style="min-height:180px;margin-top:10px">${esc(a.replies || '')}</textarea>
-        <button class="btn full dark" id="sSave3">자동 답장 저장</button>
-      </section>
-      <section class="p-sec">
         <h3>반복 메시지 <small>모든 팬에게 정해진 시간마다</small></h3>
         ${routines.map(r => `<div class="p-list-item"><div class="meta"><b>${fmtHM(r.time)} · ${daysLabel(r.days)}</b><div class="s">${esc(r.texts.split('\n')[0] || '')} ${r.texts.split('\n').filter(Boolean).length > 1 ? `외 ${r.texts.split('\n').filter(Boolean).length - 1}개` : ''}</div></div><button class="toggle ${r.enabled ? 'on' : ''}" data-rt="${r.id}"></button><button class="btn sm danger" data-rdel="${r.id}">삭제</button></div>`).join('') || '<div class="hint">반복 메시지가 없어요</div>'}
         <div class="sub-form">
@@ -1736,8 +1716,6 @@ function renderSettings() {
     Store.update(a.id, { name, bio: $('#sBio').value.trim(), emoji, color }); toast('저장했어요');
   };
   $('#sSave2').onclick = () => { Store.update(a.id, { welcome: $('#sWel').value.trim() || DEFAULT_WELCOME, bday_text: $('#sBday').value.trim() || DEFAULT_BDAY }); toast('저장했어요'); };
-  $('#sAR').onclick = () => { const v = !meArt().auto_reply; Store.update(a.id, { auto_reply: v }); $('#sAR').classList.toggle('on', v); };
-  $('#sSave3').onclick = () => { Store.update(a.id, { replies: $('#sRep').value }); toast('저장했어요'); };
   // 반복 메시지
   $$('[data-rt]').forEach(b => (b.onclick = () => { const r = Store.get(b.dataset.rt); Store.update(r.id, { enabled: !r.enabled }); b.classList.toggle('on', !r.enabled); }));
   $$('[data-rdel]').forEach(b => (b.onclick = async () => { if (await confirmBox('반복 메시지를 삭제할까요?', '')) { Store.remove(b.dataset.rdel); renderSettings(); } }));
