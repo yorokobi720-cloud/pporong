@@ -335,3 +335,12 @@ button, input, textarea, select { font-family: inherit; }
 .section-title { justify-content: flex-start; gap: 6px; }
 .section-title::before { margin-right: -2px; }
 .section-title small { margin-left: auto; }
+
+/* 휴대폰 입력 안정화: 입력칸은 항상 선택·입력 가능하게, 대화상자는 투명도만 애니메이션 */
+input, textarea, select { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.modal { animation: fade .2s ease-out both; }
+.enter-card.fan-join { cursor: default; align-items: flex-start; }
+.enter-card.fan-join:active { transform: none; }
+.nick-row { display: flex; gap: 8px; margin-top: 10px; }
+.nick-row .inp { flex: 1; min-width: 0; padding: 10px 12px; font-size: 16px; font-family: 'Galmuri11', sans-serif; }
+.nick-row .btn { flex: none; padding: 10px 14px; }

@@ -353,10 +353,13 @@ function confirmBox(title, text, ok = '확인', cancel = '취소') {
   return modal(`<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ''}<div class="row"><button class="btn" data-x>${esc(cancel)}</button><button class="btn pri" data-ok>${esc(ok)}</button></div>`,
     (m, done) => { m.querySelector('[data-x]').onclick = () => done(false); m.querySelector('[data-ok]').onclick = () => done(true); });
 }
+const isTouch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 function promptBox(title, text, value = '', max = 20, type = 'text') {
   return modal(`<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ''}<input class="inp" type="${type}" maxlength="${max}" value="${esc(value)}" autocomplete="off"><div class="row"><button class="btn" data-x>취소</button><button class="btn pri" data-ok>확인</button></div>`,
     (m, done) => {
-      const inp = m.querySelector('input'); setTimeout(() => inp.focus(), 50);
+      const inp = m.querySelector('input');
+      // 휴대폰에서는 자동 포커스를 하면 키보드가 안 뜨는 경우가 있어 PC에서만 자동 포커스
+      if (!isTouch) setTimeout(() => inp.focus(), 50);
       m.querySelector('[data-ok]').onclick = () => done(inp.value);
       inp.onkeydown = e => e.key === 'Enter' && !e.isComposing && done(inp.value);
       m.querySelector('[data-x]').onclick = () => done(null);
@@ -522,14 +525,15 @@ function renderLanding() {
       <h1>아티스트와 팬이<br>만나는 곳 💗</h1>
       <p class="lead">좋아하는 아티스트의 멤버십에 가입하고<br>나만을 위한 메시지를 받아보세요</p>
       ${lastFan ? `<button class="enter-card" id="cont">${avatarHTML(lastFan, 44)}<div><b>${esc(lastFan.nickname)}</b>(으)로 계속하기<small>팬으로 입장</small></div><span class="arr">›</span></button>` : ''}
-      <button class="enter-card" id="asFan"><span class="ei">💗</span><div><b>팬으로 입장</b><small>닉네임만 정하면 바로 시작!</small></div><span class="arr">›</span></button>
+      <div class="enter-card fan-join"><span class="ei">💗</span><div><b>팬으로 입장</b><small>닉네임만 정하면 바로 시작! (2~10자)</small>
+        <form class="nick-row" id="nickForm" autocomplete="off"><input class="inp left" id="nickIn" type="text" maxlength="10" placeholder="닉네임 입력" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn pri" type="submit">입장</button></form></div></div>
       <button class="enter-card" id="asArt"><span class="ei">🎤</span><div><b>아티스트로 입장</b><small>아티스트 비밀번호가 필요해요</small></div><span class="arr">›</span></button>
       <button class="link-btn" id="reg">새 아티스트 등록하기</button>
       <div class="mode">${Store.online ? '🟢 온라인 모드 · 친구들과 함께 소통해요' : '🧪 체험 모드 · 이 기기 안에서만 저장돼요'}${demo ? '<br>데모 아티스트 <b>뽀롱이</b> 비밀번호: <b>1234</b>' : ''}</div>
     </div>
   </div>`;
   if (lastFan) $('#cont').onclick = () => login('fan', lastFan.id);
-  $('#asFan').onclick = fanJoin;
+  $('#nickForm').onsubmit = e => { e.preventDefault(); $('#nickIn').blur(); fanJoin($('#nickIn').value); };
   $('#asArt').onclick = artistLogin;
   $('#reg').onclick = artistRegister;
 }
@@ -543,10 +547,8 @@ function login(role, id) {
   if (role === 'fan') setTimeout(maybeStampPrompt, 900);
 }
 function logout() { session = null; LS.set('session', null); navStack.length = 0; location.replace('#/'); render(); }
-async function fanJoin() {
-  const nick = await promptBox('닉네임을 정해주세요', '팬 활동에 쓰는 이름이에요 (2~10자)', '', 10);
-  if (nick == null) return;
-  const n = nick.trim();
+async function fanJoin(nick) {
+  const n = String(nick || '').trim();
   if (n.length < 2) return toast('닉네임은 2글자 이상이에요');
   const known = LS.get('myFans', []);
   const ex = fans().find(f => f.nickname.toLowerCase() === n.toLowerCase());
