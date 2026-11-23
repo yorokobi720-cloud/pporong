@@ -1,5 +1,7 @@
 # 뽀롱 (pporong)
 
+**앱 주소: https://yorokobi720-cloud.github.io/pporong/** (온라인 모드, Supabase 연결됨)
+
 아티스트(아이돌)와 팬이 소통하는 앱. 프롬·위버스 스타일, 초등 고학년 대상.
 
 ## 두 가지 입장

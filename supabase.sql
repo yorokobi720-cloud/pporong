@@ -15,6 +15,8 @@ alter table public.docs enable row level security;
 drop policy if exists "pporong all" on public.docs;
 create policy "pporong all" on public.docs for all using (true) with check (true);
 
+grant select, insert, update, delete on public.docs to anon, authenticated;
+
 -- 3) 실시간 동기화 켜기
 alter table public.docs replica identity full;
 alter publication supabase_realtime add table public.docs;
